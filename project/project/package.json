@@ -1,0 +1,15 @@
+{
+  "name": "stone-realm-prototype",
+  "version": "1.0.0",
+  "description": "Prototype 3D interactif (Three.js) — personnage jouable, ramassage et lancer de pierres, PC + mobile.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve . -l 5173",
+    "dev": "npx --yes serve . -l 5173"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16"
+  }
+}
