@@ -34,11 +34,25 @@ export class InputManager {
   _setupMouse() {
     const canvas = document.getElementById('game-canvas');
 
+    // NOTE: left-click is ONLY the throw trigger — it does NOT also start a
+    // camera drag anymore. Previously, holding left-click to look around
+    // (a very natural first instinct) fired a throw on every mousedown
+    // *before* the player had a chance to actually turn the camera, which
+    // is why throws always seemed to go "forward" and why movement kept
+    // getting interrupted (a throw locks the character for the animation's
+    // duration). Camera dragging is now exclusively the right mouse button.
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
+        this.throwAction = true; // edge, consumed once per frame in update()
+      }
+    });
+
+    // Right-drag rotates the camera.
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 2) {
         this._mouseDown = true;
         this._lastMouse = { x: e.clientX, y: e.clientY };
-        this.throwAction = true; // left click = throw (edge, consumed each frame)
       }
     });
     window.addEventListener('mouseup', () => (this._mouseDown = false));
@@ -46,15 +60,6 @@ export class InputManager {
       if (this._mouseDown) {
         this.lookDeltaX += e.clientX - this._lastMouse.x;
         this.lookDeltaY += e.clientY - this._lastMouse.y;
-        this._lastMouse = { x: e.clientX, y: e.clientY };
-      }
-    });
-
-    // Right-drag also rotates camera without throwing, feels nicer.
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 2) {
-        this._mouseDown = true;
         this._lastMouse = { x: e.clientX, y: e.clientY };
       }
     });

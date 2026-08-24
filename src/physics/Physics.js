@@ -1,6 +1,13 @@
 // Physics.js
-// Minimal hand-rolled physics for the V1. Deliberately simple:
-// gravity + integration + ground plane collision.
+//
+// NOTE: as of the physics upgrade, thrown-stone physics is handled by
+// CannonPhysics.js (real cannon-es rigid bodies, with bouncing off trees/
+// rocks/walls). This file is kept as a minimal, dependency-free reference
+// implementation of the original hand-rolled approach described in the
+// spec ("physique simple ... codée directement en JavaScript") — useful if
+// you ever want to strip the cannon-es dependency back out.
+//
+// Minimal hand-rolled physics: gravity + integration + ground plane collision.
 //
 // This module is intentionally isolated behind `Physics.update(projectiles, dt)`
 // so it can later be swapped for Rapier or Cannon-es without touching

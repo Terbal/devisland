@@ -1,13 +1,23 @@
 // Character.js
 // Builds the visual character mesh.
 //
-// V1 note: no .glb asset is bundled, so the character is assembled from
-// primitive geometries (a common, perfectly valid technique for prototypes).
-// The rig is exposed as named THREE.Group parts (head, torso, arms, legs)
-// so CharacterAnimations.js can pose them procedurally — exactly the way a
-// real bone hierarchy would be posed. Swapping in a real rigged .glb later
-// only means replacing `buildCharacter()` and feeding real AnimationClips
-// into CharacterAnimations.js; CharacterController.js does not need to change.
+// V1 note: no .glb asset is bundled by default, so the character is assembled
+// from primitive geometries (a common, valid technique for prototypes). The
+// rig is exposed as named THREE.Group parts (spine, head, torso, arms, legs)
+// so CharacterAnimations.js can pose them procedurally — the same way a real
+// bone hierarchy would be posed. See CharacterLoader.js for the code path
+// that loads a real rigged .glb instead, when one is available.
+//
+// Rig hierarchy (all local rotations are around each part's own pivot):
+//   root
+//     hips (translates up/down for crouch/jump; also the whole-body yaw)
+//       legL / legR  (hip -> knee -> foot)   — hang below the hips pivot
+//       spine        (pivots AT the hips, so rotating it forward bends the
+//                     whole upper body at the waist — torso, head and arms
+//                     all lean together, like a real forward bend)
+//         torso
+//         head
+//         armL / armR (shoulder -> elbow)    — hang below the shoulder pivot
 
 import * as THREE from 'three';
 
@@ -29,26 +39,29 @@ export function buildCharacter() {
   const root = new THREE.Group();
   root.name = 'Character';
 
-  // ---- Torso ----
   const hips = new THREE.Group();
   hips.position.y = 0.9;
   root.add(hips);
 
+  // ---- Spine pivot (bend-at-the-waist point) ----
+  const spine = new THREE.Group();
+  hips.add(spine);
+
   const torso = box(0.42, 0.5, 0.26, SHIRT);
   torso.position.y = 0.32;
-  hips.add(torso);
+  spine.add(torso);
 
   const head = new THREE.Group();
   head.position.y = 0.66;
-  hips.add(head);
+  spine.add(head);
   const headMesh = box(0.26, 0.28, 0.26, SKIN);
   head.add(headMesh);
 
-  // ---- Arms ----
+  // ---- Arms (attached to the spine, so they lean with the torso) ----
   function buildArm(sign) {
     const shoulder = new THREE.Group();
     shoulder.position.set(sign * 0.28, 0.52, 0);
-    hips.add(shoulder);
+    spine.add(shoulder);
     const upper = box(0.13, 0.32, 0.13, SHIRT);
     upper.position.y = -0.16;
     shoulder.add(upper);
@@ -66,7 +79,7 @@ export function buildCharacter() {
   const armL = buildArm(-1);
   const armR = buildArm(1);
 
-  // ---- Legs ----
+  // ---- Legs (attached directly to hips, independent of the spine bend) ----
   function buildLeg(sign) {
     const hip = new THREE.Group();
     hip.position.set(sign * 0.12, 0, 0);
@@ -92,8 +105,8 @@ export function buildCharacter() {
   const legL = buildLeg(-1);
   const legR = buildLeg(1);
 
-  // A small forward-facing marker so "front" is unambiguous while iterating.
-  root.userData.parts = { hips, head, armL, armR, legL, legR };
+  root.userData.parts = { hips, spine, head, armL, armR, legL, legR };
+  root.userData.rigged = false; // procedural rig — see CharacterLoader.js
 
   root.traverse((obj) => {
     if (obj.isMesh) {

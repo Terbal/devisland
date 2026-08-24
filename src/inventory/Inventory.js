@@ -48,4 +48,15 @@ export class Inventory {
     this._emit();
     return true;
   }
+
+  /** Restores state from a SaveSystem.load() payload. Silently ignored if shape is invalid. */
+  restore(savedInventory) {
+    if (!savedInventory || !Array.isArray(savedInventory.slots)) return;
+    this.slots = savedInventory.slots.map((s) => (s ? { itemType: s.itemType, quantity: s.quantity } : null));
+    if (this.slots.length < SLOT_COUNT) {
+      while (this.slots.length < SLOT_COUNT) this.slots.push(null);
+    }
+    this.selectedIndex = Number.isInteger(savedInventory.selectedIndex) ? savedInventory.selectedIndex : 0;
+    this._emit();
+  }
 }

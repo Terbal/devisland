@@ -1,17 +1,36 @@
 // HUD.js — small floating notifications + quality button wiring.
 
+const LEVELS = ['basse', 'moyenne', 'elevee'];
+const LABELS = { basse: 'BASSE', moyenne: 'MOYENNE', elevee: 'ÉLEVÉE' };
+
 export class HUD {
   constructor({ onQualityChange } = {}) {
     this.container = document.getElementById('notification-container');
     this.qualityBtn = document.getElementById('quality-toggle');
-    this.qualityLevels = ['BASSE', 'MOYENNE', 'ELEVEE'];
-    this.qualityIndex = 1;
+    this.onQualityChange = onQualityChange;
+    this.qualityIndex = 1; // 'moyenne'
 
     this.qualityBtn.addEventListener('click', () => {
-      this.qualityIndex = (this.qualityIndex + 1) % this.qualityLevels.length;
-      this.qualityBtn.textContent = `QUALITÉ: ${this.qualityLevels[this.qualityIndex]}`;
-      onQualityChange && onQualityChange(this.qualityLevels[this.qualityIndex].toLowerCase() === 'elevee' ? 'high' : this.qualityLevels[this.qualityIndex].toLowerCase());
+      this.qualityIndex = (this.qualityIndex + 1) % LEVELS.length;
+      this._renderQualityLabel();
+      this.onQualityChange && this.onQualityChange(LEVELS[this.qualityIndex]);
     });
+  }
+
+  _renderQualityLabel() {
+    this.qualityBtn.textContent = `QUALITÉ: ${LABELS[LEVELS[this.qualityIndex]]}`;
+  }
+
+  /** Sets the quality level (e.g. restored from a save file) without emitting onQualityChange. */
+  setQuality(levelKey) {
+    const idx = LEVELS.indexOf(levelKey);
+    if (idx === -1) return;
+    this.qualityIndex = idx;
+    this._renderQualityLabel();
+  }
+
+  getQuality() {
+    return LEVELS[this.qualityIndex];
   }
 
   notify(text) {

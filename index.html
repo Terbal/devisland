@@ -3,17 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-
 <title>Stone Realm — Prototype 3D</title>
-
-<link rel="icon" href="data:," />
-
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="./styles/main.css" />
-
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
   }
 }
 </script>
@@ -55,7 +54,7 @@
     <button id="quality-toggle" class="panel glass small-btn" title="Qualité graphique">QUALITÉ: MOYENNE</button>
 
     <div id="pc-controls-hint" class="panel glass hint">
-      ZQSD/WASD déplacement · SHIFT courir · ESPACE sauter · E ramasser · Clic lancer · Souris caméra · I inventaire
+      ZQSD/WASD déplacement · SHIFT courir · ESPACE sauter · E ramasser · Clic gauche lancer · Clic droit + glisser caméra · I inventaire
     </div>
   </div>
 

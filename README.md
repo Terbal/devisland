@@ -62,21 +62,26 @@ src/
   environment/
     Environment.js     → arbres et rochers décoratifs (procéduraux)
   character/
-    Character.js           → mesh du personnage (primitives, voir note ci-dessous)
-    CharacterController.js → machine à états + mouvement + limites de zone
-    CharacterAnimations.js → poses procédurales par état (idle/walk/run/jump/…)
+    Character.js           → mesh du personnage procédural (primitives + pivot de colonne vertébrale)
+    CharacterLoader.js      → tente de charger un vrai .glb riggé, sinon retombe sur Character.js
+    CharacterController.js → machine à états + mouvement + collisions + orientation vers la caméra au lancer
+    CharacterAnimations.js → poses procédurales OU AnimationMixer réel, selon ce qui a été chargé
   input/
     InputManager.js    → API unique consommée par le reste du jeu
     KeyboardInput.js    → clavier brut
     TouchInput.js       → joystick + boutons + swipe caméra
   inventory/
-    Inventory.js        → modèle de données (slots)
+    Inventory.js        → modèle de données (slots) + restauration depuis une sauvegarde
     Hotbar.js            → rendu DOM lié à Inventory
   objects/
     Stone.js             → objet pierre (ramassable)
     PickupSystem.js       → détection de proximité + retrait du monde
   physics/
-    Physics.js           → gravité + trajectoire + collision sol pour les pierres lancées
+    Collision.js          → résolveur léger cercle-contre-cercle (personnage ↔ obstacles/murs)
+    CannonPhysics.js       → monde cannon-es réel (pierres lancées : gravité, rebonds, roulement)
+    Physics.js             → ancienne implémentation JS simple, conservée en référence
+  save/
+    SaveSystem.js          → sauvegarde locale (inventaire, qualité) via localStorage
   ui/
     HUD.js, InteractionPrompt.js, MobileControls.js
 ```
@@ -88,18 +93,11 @@ IDLE/WALK/RUN → PICKUP → IDLE   (verrouillé pendant l'animation)
 IDLE/WALK/RUN → THROW  → IDLE   (verrouillé pendant l'animation)
 ```
 
-### ⚠️ Note importante sur le personnage 3D
-Cette V1 ne télécharge **aucun modèle `.glb` externe** (environnement sans accès réseau pendant la génération). Le personnage est donc assemblé à partir de primitives Three.js (`BoxGeometry`) organisées en hiérarchie de groupes (tronc → bras/jambes), et animé **procéduralement** (poses calculées chaque frame selon l'état courant), plutôt qu'avec un vrai rig + `AnimationMixer`.
-
-L'architecture a été conçue pour absorber un vrai modèle sans rien casser :
-- Remplacez `buildCharacter()` dans `Character.js` par un chargement `GLTFLoader` d'un personnage riggé.
-- Remplacez le corps de `CharacterAnimations.update()` par de vrais `THREE.AnimationMixer` / `AnimationAction` (le code en commentaire dans le fichier montre exactement comment).
-- `CharacterController.js` n'a besoin d'aucune modification : il ne connaît que la machine à états, pas la façon dont les poses sont produites.
-
-Pour ajouter un vrai modèle : déposez-le dans `assets/characters/character.glb` (dossier déjà prévu) avec des clips nommés `Idle, Walk, Run, Jump, Fall, Pickup, Throw`.
+### ⚠️ Note sur le personnage 3D
+Le chargement d'un vrai `.glb` riggé est déjà branché (voir la section "Personnage réel (.glb)" plus haut) — mais cette V1 est livrée **sans** fichier `.glb` lui-même, faute d'accès réseau pendant la génération du projet pour en récupérer un. Sans fichier, `CharacterLoader.js` retombe automatiquement sur le personnage procédural (primitives Three.js + pivot de colonne vertébrale pour un buste qui s'incline correctement). Dès qu'un `character.glb` valide est déposé dans `assets/characters/`, il prend le relais sans aucune modification de code.
 
 ### Pierres et rochers décoratifs
-Même logique : `Stone.js` utilise une géométrie procédurale (`IcosahedronGeometry`) plutôt qu'un `.glb`, et `Environment.js` génère arbres/rochers procéduralement. Les dossiers `assets/objects/stone.glb` et `assets/environment/*.glb` sont prévus pour un remplacement futur par de vrais modèles.
+Même logique : `Stone.js` utilise une géométrie procédurale (`IcosahedronGeometry`) plutôt qu'un `.glb`, et `Environment.js` génère arbres/rochers procéduralement (et exporte leurs positions/rayons pour les collisions). Les dossiers `assets/objects/stone.glb` et `assets/environment/*.glb` sont prévus pour un remplacement futur par de vrais modèles — purement visuel, aucune logique de jeu n'en dépend.
 
 ---
 
@@ -131,19 +129,102 @@ Attention aux chemins relatifs si vous ajoutez de vrais fichiers `.glb` dans `as
 
 ---
 
-## ✅ Ce qui fonctionne dans cette V1
+## ✅ Ce qui fonctionne dans cette V1 (+ améliorations)
 
-- Déplacement (marche/course), saut, limites de zone
-- Détection + ramassage de pierres avec mise à jour réelle de l'inventaire
+- Déplacement (marche/course), saut
+- **Collisions réelles** : le personnage ne traverse plus les arbres/rochers, et les murs de périmètre sont de vrais obstacles (voir §Physique ci-dessous)
+- Détection + ramassage de pierres avec mise à jour réelle de l'inventaire, **animation de ramassage réaliste** (le buste se penche en avant depuis la taille, genoux fléchis, bras qui atteignent le sol)
 - Sélection de pierre (hotbar, touches 1–5)
-- Visée (direction caméra) + lancer avec vitesse initiale, gravité, trajectoire parabolique, collision sol
-- Machine à états avec transitions et animations procédurales par état
+- Visée (direction caméra) + lancer avec vitesse initiale, gravité, trajectoire parabolique, **rebonds réels sur le sol/rochers/arbres/murs**
+- **Le personnage se tourne pour faire face à la direction de la caméra au moment du lancer** : le geste du bras et la trajectoire de la pierre sont donc toujours cohérents, même si le joueur était de profil juste avant
+- Machine à états avec transitions et animations (procédurales, ou via un vrai modèle `.glb` si vous en fournissez un — voir plus bas)
 - Contrôles complets PC (clavier + souris) et mobile (joystick + boutons + swipe caméra)
 - Réglage de qualité graphique
+- **Sauvegarde locale** (inventaire + qualité graphique) restaurée automatiquement au chargement
 - Site 100% statique, déployable sans backend
 
-## 🔜 Prochaines étapes suggérées (hors V1)
-- Vrai modèle `.glb` riggé + `AnimationMixer`
-- Physique avancée (Rapier / Cannon-es) pour collisions pierre↔objets
-- Obstacles/rochers collidables remplaçant le clamp de périmètre
-- Système de sauvegarde local (progression, inventaire)
+## 🧠 Corrections récentes
+
+- **Course cassée + lancer "toujours vers l'avant"** : ces deux bugs distincts avaient en fait la même cause. Le clic gauche déclenchait *à la fois* le lancer *et* la rotation de la caméra (glisser-déposer). Résultat : dès que vous mainteniez le clic gauche pour regarder autour de vous (le réflexe naturel), ça lançait une pierre et figeait le personnage en pleine course pendant toute l'animation de lancer — d'où l'impression que courir ne marchait pas, et que la pierre partait toujours "vers l'avant" (avant même d'avoir pu tourner la caméra). Corrigé : le clic gauche ne fait plus que lancer, la caméra se contrôle exclusivement au clic **droit** + glisser (`InputManager.js`).
+- **Personnage qui semble léviter** : certains rigs importés n'ont pas leurs pieds exactement à l'origine du modèle en pose de repos. `CharacterLoader.js` recalcule maintenant automatiquement la bounding box du modèle chargé et décale son origine pour que les pieds touchent exactement `y=0`, quel que soit le modèle utilisé. Le personnage chargé est aussi isolé dans un groupe wrapper dédié qu'aucune piste d'animation ne peut modifier par erreur (évite tout conflit entre le mixer et la rotation gérée manuellement par `CharacterController`).
+- **Rotation de lancer trop brusque** : au lieu d'un snap instantané vers la direction de la caméra, le personnage pivote maintenant en douceur pendant l'élan (voir `THROW_TURN_LERP` dans `CharacterController.js`) — la rotation se termine bien avant le point de relâcher, mais se voit comme un vrai pivot plutôt qu'une téléportation de rotation.
+- **Animation de ramassage** : le rig procédural a un vrai pivot de colonne vertébrale (`spine`, dans `Character.js`) sur lequel le buste, la tête et les bras s'inclinent ensemble vers l'avant. Pour le personnage riggé, c'est désormais le vrai clip `PickUp` de KayKit qui joue.
+- **Gauche/droite inversés** : la formule convertissant l'input (joystick/clavier) en angle de déplacement avait un signe horizontal inversé, corrigé dans `CharacterController.js`.
+
+## ⚙️ Choisir/redimensionner le personnage (paramètre dédié)
+
+Tout se règle dans **`character/characterConfig.js`**, un seul fichier :
+
+```js
+export const CHARACTER_CONFIG = {
+  modelPath: './assets/characters/roster/Rogue.glb',
+  targetHeight: 1.6, // en unités monde — diminuez pour un perso plus petit
+};
+```
+
+Le roster complet KayKit est déjà présent dans `assets/characters/roster/` : `Rogue.glb`, `Rogue_Hooded.glb`, `Knight.glb`, `Mage.glb`, `Ranger.glb`, `Barbarian.glb`. Changez juste `modelPath` pour basculer instantanément sur un autre — pas besoin de toucher au reste du code. `targetHeight` recalcule automatiquement l'échelle du modèle chargé (voir `CharacterLoader.js` → `normalizeHeightAndGrounding()`), donc n'importe quel futur modèle s'aligne correctement sans réglage manuel.
+
+⚠️ **Cas particulier — Barbarian** : ce personnage utilise le rig KayKit "Large" (squelette différent de "Medium" utilisé par les 5 autres). Les animations livrées par défaut (`manifest.json`) sont pour le rig Medium ; avec Barbarian elles ne se lieront pas correctement. Les fichiers d'animation "Large" correspondants sont déjà inclus dans `assets/characters/animations/rig_large/` — remplacez le contenu de `manifest.json` par ces chemins-là si vous voulez utiliser Barbarian animé.
+
+## 🪨 Le personnage tient vraiment la pierre
+
+Avant, la pierre ramassée disparaissait purement dans l'inventaire (UI seulement). Maintenant (`objects/HeldStone.js`) :
+- Une pierre miniature est attachée directement au squelette du personnage — à l'os `handslot.r` de KayKit pendant les gestes de ramassage/lancer, et à l'os `hips` (comme rangée à la ceinture) le reste du temps.
+- Elle apparaît dès qu'une pierre est ramassée, et disparaît quand le stock du slot sélectionné tombe à 0 (`main.js` → `syncHeldStoneVisual()`, câblé sur `inventory.onChange`).
+- Sur le personnage procédural (sans `.glb`), elle s'attache au bras droit en approximation — le comportement reste cohérent même sans modèle riggé.
+
+## 🔊 Musique de fond en boucle
+
+Déposez votre fichier audio ici :
+
+```
+assets/audio/ambient-music.mp3
+```
+
+C'est tout — `src/audio/AudioManager.js` le détecte automatiquement au démarrage, le joue en boucle (volume 35%), et démarre au premier clic/touche (obligatoire, les navigateurs bloquent l'autoplay tant qu'il n'y a pas eu d'interaction). Aucun fichier présent → aucune erreur, juste un message console informatif. Pour changer le nom/format accepté, éditez `MUSIC_PATH` en haut du fichier. Voir aussi `assets/audio/README.txt`.
+
+## ⚙️ Architecture physique
+
+Deux systèmes, choisis délibérément selon le besoin :
+
+- **`physics/Collision.js`** — résolveur léger cercle-contre-cercle utilisé pour le déplacement du personnage contre les rochers/arbres (`environment/Environment.js` exporte leurs positions et rayons) et contre les murs de périmètre. Rapide, déterministe, sans jitter — adapté à une petite arène avec peu d'obstacles statiques (priorité donnée à la performance, comme demandé dans le prompt).
+- **`physics/CannonPhysics.js`** — un vrai monde physique [cannon-es](https://github.com/pmndrs/cannon-es) (chargé via CDN dans l'import map, aucune installation nécessaire) pour les pierres lancées : gravité réelle, rebonds sur le sol/les rochers/les arbres/les murs, roulement, sommeil automatique des corps immobiles pour rester léger. C'est le point d'extension prévu par le prompt ("prévoir une architecture permettant d'intégrer ultérieurement Rapier ou Cannon-es").
+
+## 🧍 Personnage réel (.glb/.gltf) — prêt à brancher, 100% navigateur
+
+`character/CharacterLoader.js` charge en premier le modèle configuré dans `characterConfig.js` (Rogue par défaut, déjà inclus — voir la section juste au-dessus), puis retombe sur `assets/characters/character.glb`/`.gltf` si vous préférez déposer un fichier unique sans toucher au config. Si un modèle est trouvé et contient des animations, `CharacterAnimations.js` bascule en mode "rigged" et pilote un vrai `THREE.AnimationMixer` avec cross-fades. Si rien n'est trouvé, le jeu retombe silencieusement sur le personnage procédural — aucune erreur, aucun code à modifier.
+
+**Aucune nomenclature exacte de clip requise.** Plutôt que d'exiger des clips nommés pile `Idle`/`Walk`/`Run`/etc., `CharacterAnimations.js` fait correspondre chaque état du jeu au premier clip dont le nom *contient* un mot-clé proche (`STATE_ALIASES` en haut du fichier — "pickup", "pick_up", "interact", "grab", "loot" matchent tous l'état PICKUP, par exemple). Ça évite d'avoir à renommer quoi que ce soit à la main, ce qui compte puisque la plupart des packs gratuits n'utilisent pas cette convention. Un état sans clip correspondant garde simplement la dernière animation affichée — le jeu reste jouable, seul cet état précis est moins poli visuellement.
+
+### Obtenir un personnage riggé sans Blender (100% web)
+
+Mixamo est capricieux ces derniers temps (pannes récurrentes côté Adobe). Une alternative fiable et **entièrement navigateur**, sans logiciel à installer :
+
+1. Téléchargez un personnage sur **[KayKit — Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers)** (gratuit, CC0, fourni en `.GLTF` directement).
+2. Téléchargez **[KayKit — Character Animations](https://kaylousberg.itch.io/kaykit-character-animations)** (gratuit, CC0, 161 animations, même squelette que les personnages Adventurers — donc compatibles sans retargeting).
+3. Repérez dans le zip du personnage le fichier `.glb` (ou le dossier `.gltf` + `.bin` + textures), et déposez-le dans `assets/characters/` sous le nom `character.glb` (ou `character.gltf` + ses fichiers associés si c'est le format "Separate").
+4. Choisissez dans le pack d'animations les fichiers qui vous intéressent (idle, walk, run, jump, une animation "interact"/"pickup", une animation de lancer/tir...) et déposez-les dans `assets/characters/animations/`.
+5. Listez leurs chemins dans `assets/characters/animations/manifest.json`, un simple tableau JSON :
+   ```json
+   ["./assets/characters/animations/Idle.gltf", "./assets/characters/animations/Walk.gltf"]
+   ```
+6. Rechargez la page. `CharacterLoader.js` charge le personnage, charge chaque fichier du manifeste, fusionne tous les clips trouvés, et `CharacterAnimations.js` s'occupe du mapping par mots-clés automatiquement.
+
+Pourquoi ça marche sans Blender : le personnage et les animations partagent le même squelette (mêmes noms d'os), donc `mixer.clipAction(clip)` fonctionne même si le clip vient d'un fichier différent de celui du mesh — exactement le même principe que le retargeting Mixamo entre personnages compatibles.
+
+Si `manifest.json` reste vide ou absent, ce dossier est simplement ignoré (pas d'erreur) — pratique si vous voulez d'abord tester avec juste les animations déjà incluses dans `character.glb`.
+
+## 💾 Sauvegarde locale
+
+`save/SaveSystem.js` persiste l'inventaire (quantité de pierres, slot sélectionné) et la qualité graphique dans `localStorage`, et les restaure automatiquement à l'ouverture de la page. C'est une vraie page web statique classique : `localStorage` fonctionne normalement dans un déploiement réel (GitHub Pages / Render). Effacer les données : ouvrez la console et appelez `localStorage.removeItem('stone-realm-save-v1')`.
+
+> Note : le fichier `stone-realm-preview.html` fourni séparément (aperçu rapide en un seul fichier) n'inclut volontairement pas ce module — l'environnement d'aperçu intégré ne supporte pas `localStorage`. Le vrai projet ci-dessus l'a en entier.
+
+## 🔜 Prochaines étapes suggérées (au-delà de cette version)
+- ~~Vrai modèle `.glb` riggé + `AnimationMixer`~~ → architecture prête (`CharacterLoader.js`), il ne manque que le fichier `.glb` lui-même
+- ~~Physique avancée (Rapier / Cannon-es) pour collisions pierre↔objets~~ → fait avec cannon-es (`CannonPhysics.js`)
+- ~~Obstacles/rochers collidables remplaçant le clamp de périmètre~~ → fait (`Collision.js` + murs physiques dans `CannonPhysics.js`)
+- ~~Système de sauvegarde locale (progression, inventaire)~~ → fait (`SaveSystem.js`)
+- Sauvegarde des pierres déjà ramassées dans le monde (actuellement seul le compte total est sauvegardé, le monde se réinitialise au rechargement)
+- Vraies collisions de personnage en 3D (capsule physique) plutôt qu'un cercle 2D sur le plan XZ, si le terrain devient accidenté
+- Système de dégâts/destruction quand une pierre touche un objet
